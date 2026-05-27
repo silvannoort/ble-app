@@ -56,12 +56,18 @@ export default function App() {
               return;
             }
             const name = device?.localName ?? device?.name ?? '';
-            if (name === 'BEACON_A') {
-              setColor('red');
-              setStatus('BEACON_A detected');
-            } else if (name === 'BEACON_B') {
-              setColor('blue');
-              setStatus('BEACON_B detected');
+            const rssi = device?.rssi ?? -100;
+            if (name === 'BEACON_A' || name === 'BEACON_B') {
+              if (rssi < -50) {
+                setColor('white');
+                setStatus(`${name} — te ver weg (RSSI: ${rssi})`);
+              } else if (name === 'BEACON_A') {
+                setColor('red');
+                setStatus(`BEACON_A (RSSI: ${rssi})`);
+              } else {
+                setColor('blue');
+                setStatus(`BEACON_B (RSSI: ${rssi})`);
+              }
             }
           });
         } else if (state === 'PoweredOff') {
