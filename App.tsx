@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Alert, PermissionsAndroid, Platform, StyleSheet, Text, View } from 'react-native';
-import { BleManager } from 'react-native-ble-plx';
+import { BleManager, ScanMode } from 'react-native-ble-plx';
 
 type BeaconColor = 'white' | 'red' | 'blue';
 
@@ -30,6 +30,7 @@ export default function App() {
   const [color, setColor] = useState<BeaconColor>('white');
   const [status, setStatus] = useState('Starting scan...');
   const scanning = useRef(false);
+  const latestRssi = useRef<Record<string, number>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -49,7 +50,7 @@ export default function App() {
           subscription.remove();
           setStatus('Scanning...');
 
-          manager.startDeviceScan(null, null, (error, device) => {
+          manager.startDeviceScan(null, { scanMode: ScanMode.LowLatency }, (error, device) => {
             if (!mounted) return;
             if (error) {
               setStatus(`Error: ${error.message}`);
@@ -57,17 +58,25 @@ export default function App() {
             }
             const name = device?.localName ?? device?.name ?? '';
             const rssi = device?.rssi ?? -100;
-            if (name === 'BEACON_A' || name === 'BEACON_B') {
-              if (rssi < -50) {
-                setColor('white');
-                setStatus(`${name} — te ver weg (RSSI: ${rssi})`);
-              } else if (name === 'BEACON_A') {
-                setColor('red');
-                setStatus(`BEACON_A (RSSI: ${rssi})`);
-              } else {
-                setColor('blue');
-                setStatus(`BEACON_B (RSSI: ${rssi})`);
-              }
+
+            if (name !== 'BEACON_A' && name !== 'BEACON_B') return;
+
+            latestRssi.current[name] = rssi;
+
+            const rssiA = latestRssi.current['BEACON_A'] ?? -Infinity;
+            const rssiB = latestRssi.current['BEACON_B'] ?? -Infinity;
+            const winner = rssiA >= rssiB ? 'BEACON_A' : 'BEACON_B';
+            const winnerRssi = Math.max(rssiA, rssiB);
+
+            if (winnerRssi < -70) {
+              setColor('white');
+              setStatus(`${winner} — te ver weg (RSSI: ${winnerRssi})`);
+            } else if (winner === 'BEACON_A') {
+              setColor('red');
+              setStatus(`BEACON_A (RSSI: ${winnerRssi})`);
+            } else {
+              setColor('blue');
+              setStatus(`BEACON_B (RSSI: ${winnerRssi})`);
             }
           });
         } else if (state === 'PoweredOff') {
